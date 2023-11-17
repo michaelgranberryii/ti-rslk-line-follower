@@ -164,7 +164,7 @@ int32_t Reflectance_Sensor_Position(uint8_t data)
     else
     {
         // If no sensors are active, return a default position value
-        return Weight[0] + 1;
+        return Weight[0] + 1; // 335
     }
 }
 

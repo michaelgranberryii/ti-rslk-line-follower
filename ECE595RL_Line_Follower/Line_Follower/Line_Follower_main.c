@@ -46,6 +46,12 @@
 #define PWM_MIN             (PWM_NOMINAL - PWM_SWING)
 #define PWM_MAX             (PWM_NOMINAL + PWM_SWING)
 
+const uint16_t NO_BLACK = 335;
+const uint16_t ALL_BLACK = 0;
+
+uint8_t no_black_counter = 0;
+uint8_t t_flag = 0;
+uint8_t center_range = 100;
 // Declare global variables used to update PWM duty cycle values for the motors
 uint16_t Duty_Cycle_Left;
 uint16_t Duty_Cycle_Right;
@@ -181,14 +187,121 @@ void Line_Follower_Controller_1()
 }
 
 /**
- * @brief
- *
- *
+ * @brief Task 1: Implements the finite state machine (FSM) for a simple Line Follower robot and T intersection.
+ * @return None
+ */
+void Line_Follower_FSM_2() {
+    switch(current_state)
+    {
+        case CENTER:
+        {
+            LED2_Output(RGB_LED_GREEN);
+            Motor_Forward(PWM_NOMINAL, PWM_NOMINAL);
+            break;
+        }
+
+        case LEFT:
+        {
+            LED2_Output(RGB_LED_BLUE);
+            Motor_Left(PWM_NOMINAL, PWM_NOMINAL);
+            break;
+        }
+
+        case RIGHT:
+        {
+            LED2_Output(RGB_LED_YELLOW);
+            Motor_Right(PWM_NOMINAL, PWM_NOMINAL);
+            break;
+        }
+    }
+}
+
+/**
+ * @brief Task 1: Implements the control logic for the Line Follower robot for a line-following and T intersection robot based on sensor readings. 
  * @return None
  */
 void Line_Follower_Controller_2()
 {
+    // Increment SysTick_counter by 1 every time the SysTick periodic interrupt occurs
+    SysTick_counter = SysTick_counter + 1;
 
+    // Start the process of reading the reflectance sensor array every 10 ms (i.e. 11, 21, 31, ...)
+    if ((SysTick_counter % 10) == 1)
+    {
+        Reflectance_Sensor_Start();
+    }
+
+    // Finish reading the reflectance sensor sensor array after 1 ms (i.e. 12, 22, 32, ...)
+    if ((SysTick_counter % 10) == 2)
+    {
+        Line_Sensor_Data = Reflectance_Sensor_End();
+        Line_Sensor_Position = Reflectance_Sensor_Position(Line_Sensor_Data);
+
+        if (!t_flag) {
+            // Check if the robot is at the center of the line (or very close to it)
+            // Assign current_state to CENTER so that the robot will keep moving forward at the center
+
+            if (Line_Sensor_Position > -center_range && Line_Sensor_Position < center_range)
+            {
+                current_state = CENTER;
+            }
+            else if (Line_Sensor_Position == ALL_BLACK) {
+                t_flag = 1;
+            }
+            // Check if the robot is on the left side of the line
+            // Assign current_state to RIGHT to steer the robot to the right in order to move back to the center
+            else if (Line_Sensor_Position >= center_range && Line_Sensor_Position < 332)
+            {
+                current_state = RIGHT;
+                if (Line_Sensor_Position > -center_range && Line_Sensor_Position < center_range)
+                {
+                    current_state = CENTER;
+                }
+            }
+
+            // Check if the robot is on the right side of the line
+            // Assign current_state to LEFT to steer the robot to the left in order to move back to the center
+            else if (Line_Sensor_Position <= -center_range && Line_Sensor_Position > -332)
+            {
+                current_state = LEFT;
+                if (Line_Sensor_Position > -center_range && Line_Sensor_Position < center_range)
+                {
+                    current_state = CENTER;
+                }
+            }
+
+            // Otherwise, the robot will keep turning right at other positions (e.g. dead end)
+            else
+            {
+                current_state = RIGHT;
+            }
+        } else {
+
+            if (Line_Sensor_Position >= center_range && Line_Sensor_Position < 332)
+            {
+                current_state = RIGHT;
+                if (Line_Sensor_Position > -center_range && Line_Sensor_Position < center_range)
+                {
+                    current_state = CENTER;
+                }
+            }
+//            if (Line_Sensor_Position == NO_BLACK)
+//            {
+//                no_black_counter++;
+//                if (no_black_counter == 2) {
+//                    t_flag = 0;
+//                    no_black_counter = 0;
+//                }
+//                current_state = RIGHT;
+//                if (Line_Sensor_Position > -47 && Line_Sensor_Position < 47)
+//                {
+//                    current_state = CENTER;
+//                }
+//            }
+
+
+        }
+    }
 }
 
 
@@ -237,6 +350,7 @@ void Timer_A1_Periodic_Task(void)
     #endif
 
     // Your function for Task 1 goes here (Line_Follower_FSM_2)
+    Line_Follower_FSM_2();
 
 #else
     #error "Define either one of the options: CONTROLLER_1 or CONTROLLER_2."
@@ -285,6 +399,8 @@ int main(void)
 
     while(1)
     {
-
+           printf("data: %d\n", Line_Sensor_Position);
+           printf("flag: %d\n", t_flag);
+           printf("counter %d\n", no_black_counter);
     }
 }
